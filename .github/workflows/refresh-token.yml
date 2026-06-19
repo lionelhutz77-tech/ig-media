@@ -1,0 +1,32 @@
+name: Refresh Instagram Token
+
+on:
+  schedule:
+    # Jeden Montag 04:00 UTC. Token ~60 Tage gueltig, woechentlich ist reichlich Puffer.
+    - cron: '0 4 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests
+      - name: Token erneuern
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python refresh_token.py
+      - name: Ablaufdatum zuruecksichern
+        run: |
+          git config user.name "kiai-autopost"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Token erneuert"
+          git push
