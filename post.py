@@ -80,6 +80,10 @@ def main():
 
     rel = d.relative_to(ROOT).as_posix()
     urls = [f"{REPO_RAW}/{rel}/{s.name}" for s in slides]
+    if len(urls) > 10:
+        # Instagram-Karussell erlaubt MAX 10 Slides -> sonst 400 beim Container.
+        print(f"  WARN: {len(urls)} Slides > 10 -> kuerze auf die ersten 10.")
+        urls = urls[:10]
     caption = (d / "caption.txt").read_text(encoding="utf-8").strip()
     print(f"Veroeffentliche {d.name} mit {len(urls)} Slides...")
     post_id = publish(uid, token, urls, caption)

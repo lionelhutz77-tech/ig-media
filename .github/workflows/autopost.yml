@@ -2,8 +2,9 @@ name: Auto-Post Instagram
 
 on:
   schedule:
-    # 16:00 UTC = 18:00 Berlin (Sommerzeit / CEST). Im Winter (CET) = 17:00.
-    - cron: '0 16 * * *'
+    # 08:00 UTC = 10:00 Berlin (Sommerzeit / CEST). Im Winter (CET) = 09:00.
+    # Hinweis: GitHub kann geplante Laeufe um bis zu mehrere Stunden verzoegern.
+    - cron: '0 8 * * *'
   workflow_dispatch: {}
 
 permissions:
