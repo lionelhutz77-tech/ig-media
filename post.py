@@ -54,6 +54,45 @@ def ledger_has(core: str) -> bool:
     return bool(core) and core in load_ledger()
 
 
+def telegram(msg: str) -> None:
+    """Sendet eine Telegram-Notiz (still, wenn Secrets fehlen)."""
+    tok = os.environ.get("TELEGRAM_TOKEN")
+    chat = os.environ.get("TELEGRAM_CHAT_ID")
+    if not tok or not chat:
+        return
+    try:
+        requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
+                      data={"chat_id": chat, "text": msg}, timeout=15)
+    except Exception as e:
+        print(f"  WARN Telegram: {e}")
+
+
+def rest_vorrat(account_cores) -> list:
+    """Freigegebene, noch nicht veroeffentlichte Karussells (echter Restvorrat)."""
+    rest = []
+    for d in sorted((ROOT / "queue").glob("item_*")):
+        if not (d / "APPROVED").exists():
+            continue
+        cap = d / "caption.txt"
+        if not cap.exists() or not sorted(d.glob("slide_*.jpg")):
+            continue
+        core = caption_core(cap.read_text(encoding="utf-8").strip())
+        if (d / "PUBLISHED.txt").exists() or ledger_has(core) or ist_live(core, account_cores):
+            continue
+        rest.append(d.name)
+    return rest
+
+
+def warn_if_low(account_cores) -> None:
+    """Telegram-Frühwarnung, wenn der Restvorrat knapp wird (<=2)."""
+    rest = rest_vorrat(account_cores)
+    n = len(rest)
+    if n == 0:
+        telegram("⚠️ kiai-Vorrat LEER: keine freigegebenen Karussells mehr — bald kein Post mehr! Bitte Nachschub bauen.")
+    elif n <= 2:
+        telegram(f"⚠️ kiai-Vorrat niedrig: nur noch {n} Karussell(s) in der Queue. Bitte Nachschub bauen.")
+
+
 # --- Account-Abgleich (Quelle der Wahrheit) ------------------------------
 
 def account_caption_cores(uid: str, token: str, limit: int = 50):
@@ -163,11 +202,13 @@ def main():
     std = stunden_seit(neueste_ts)
     if account_cores is not None and std is not None and std < 12:
         print(f"Vor {std:.1f}h wurde bereits gepostet — uebersprungen (max 1/Tag).")
+        warn_if_low(account_cores)
         return
 
     d, slides, core = next_item(account_cores)
     if not d:
         print("Kein freigegebenes, ungepostetes Karussell in der Warteschlange.")
+        warn_if_low(account_cores)
         return
 
     rel = d.relative_to(ROOT).as_posix()
@@ -199,6 +240,7 @@ def main():
         (d / "PUBLISHED.txt").write_text(
             f"{time.strftime('%Y-%m-%d %H:%M')} post_id={post_id}\n", encoding="utf-8")
         ledger_add(core)
+        warn_if_low(account_cores)
     else:
         raise SystemExit(f"FEHLER: {d.name} wurde NICHT veroeffentlicht ({fehler}). Nicht markiert.")
 
